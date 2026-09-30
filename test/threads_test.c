@@ -3,32 +3,40 @@
 #include <stdint.h>
 #include <unity.h>
 #include "unity_config.h"
+#include <FreeRTOS.h>
 #include <semphr.h>
+#include <threads.h>
 
 SemaphoreHandle_t semaphore;
 int counter;
-
-int portMAX_DELAY = 5;
 
 void setUp(void) {}
 
 void tearDown(void) {}
 
 
+void test_smoke_string(void) {
+    const char *expected = "hello unity";
+    const char *actual = "hello unity";
+
+    printf("Smoke test: UART/Unity pipeline is alive\n");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(expected, actual, "Smoke test string mismatch\n");
+}
+
 void test_side_thread_available(void) {
-    semaphore = xSemaphoreCreateCount(1, 1);
+    semaphore = xSemaphoreCreateCounting(1, 1);
     counter = 0;
 
     int loop_return = do_loop(semaphore, &counter, "side", portMAX_DELAY);
 
-    printf("Testing do_loop for side with available semaphore\n\n")
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, &counter, "Counter did not incremenet on available semaphore\n");
+    printf("Testing do_loop for side with available semaphore\n\n");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, counter, "Counter did not increment on available semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, loop_return, "Semaphore did not return available status code when available\n");
     printf("OK\n\n");
 }
 
 void test_side_thread_unavailable(void) {
-    semaphore = xSemaphoreCreateCount(1, 1);
+    semaphore = xSemaphoreCreateCounting(1, 1);
     counter = 0;
 
     // Semaphore is unavailable
@@ -37,25 +45,25 @@ void test_side_thread_unavailable(void) {
     int loop_return = do_loop(semaphore, &counter, "side", portMAX_DELAY);
 
     printf("Testing do_loop for side with unavailable semaphore\n\n");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, &counter, "Counter incremented on unavailable semaphore\n");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, loop_return, "Semaphore did not return unavailable status code when unavailable\n");
     printf("OK\n\n");
 }
 
 void test_main_thread_available(void) {
-    semaphore = xSemaphoreCreateCount(1, 1);
+    semaphore = xSemaphoreCreateCounting(1, 1);
     counter = 0;
 
     int loop_return = do_loop(semaphore, &counter, "main", portMAX_DELAY);
 
-    printf("Testing do_loop for main with available semaphore\n\n")
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, &counter, "Counter did not incremenet on available semaphore\n");
+    printf("Testing do_loop for main with available semaphore\n\n");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, counter, "Counter did not incremenet on available semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, loop_return, "Semaphore did not return available status code when available\n");
     printf("OK\n\n");
 }
 
 void test_main_thread_unavailable(void) {
-    semaphore = xSemaphoreCreateCount(1, 1);
+    semaphore = xSemaphoreCreateCounting(1, 1);
     counter = 0;
 
     // Semaphore is unavailable
@@ -64,7 +72,7 @@ void test_main_thread_unavailable(void) {
     int loop_return = do_loop(semaphore, &counter, "main", portMAX_DELAY);
 
     printf("Testing do_loop for main with unavailable semaphore\n\n");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, &counter, "Counter incremented on unavailable semaphore\n");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, loop_return, "Semaphore did not return unavailable status code when unavailable\n");
     printf("OK\n\n");
 }
@@ -77,6 +85,7 @@ int main (void)
         sleep_ms(5000); // Give time for TTY to attach.
         printf("Start tests\n");
         UNITY_BEGIN();
+        RUN_TEST(test_smoke_string);
         RUN_TEST(test_main_thread_available);
         RUN_TEST(test_main_thread_unavailable);
         RUN_TEST(test_side_thread_available);

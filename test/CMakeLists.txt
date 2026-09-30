@@ -1,4 +1,4 @@
-add_executable(mytest test.c unity_config.c)
+add_executable(mytest unity_config.c threads_test.c ${CMAKE_SOURCE_DIR}/src/threads.c)
 
 target_link_libraries(mytest PRIVATE
   pico_stdlib
