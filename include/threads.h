@@ -5,10 +5,19 @@
 #include <semphr.h>
 #include <task.h>
 
+struct deadlock_args {
+    SemaphoreHandle_t first;
+    SemaphoreHandle_t second;
+    int counter;
+    char id;
+};
+
 int do_loop(SemaphoreHandle_t semaphore,
             int *counter,
             const char *src,
             TickType_t timeout);
+            
+void deadlock(void *params);
 
 typedef struct {
     SemaphoreHandle_t first;       // lock this task takes first

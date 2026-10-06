@@ -19,27 +19,40 @@ int do_loop(SemaphoreHandle_t semaphore,
     return pdTRUE;
 }
 
-void grab_two_locks(void *pvParameters)
-{
-    lock_pair_t *p = (lock_pair_t *)pvParameters;
+void deadlock(void *params) {
+    struct deadlock_args *args = (struct deadlock_args *)params;
 
-    xSemaphoreTake(p->first, portMAX_DELAY);
-    printf("%s: took first lock\n", p->name);
-    (*p->counter)++;
+    args->counter++; // count should be 1 for deadlock start
+    printf("Entered deadlock %c\n", args->id);
 
-    // Barrier: don't reach for the second lock until we know the other task
-    // is already holding its first one too, so the deadlock is deterministic
-    // instead of a race.
-    xSemaphoreGive(p->my_ready);
-    xSemaphoreTake(p->other_ready, portMAX_DELAY);
+    xSemaphoreTake(args->first, portMAX_DELAY);
+    {
+        args->counter++; // count should be 2 if reached
+        printf("Holding first lock %c\n", args->id);
 
-    printf("%s: waiting on second lock...\n", p->name);
-    xSemaphoreTake(p->second, portMAX_DELAY); // never returns: the other task holds this
+        // Delay until other thread grabs its lock
+        vTaskDelay(100);
 
-    printf("%s: took second lock\n", p->name);
-    (*p->counter)++;
+        xSemaphoreTake(args->second, portMAX_DELAY);
+        {
+            args->counter++; // count should be 3 if reached
+            printf("Holding both locks %c\n", args->id);
+        }
+        xSemaphoreGive(args->second);
+    }
+    xSemaphoreGive(args->first);
+    vTaskSuspend(NULL); // suspend this task to avoid it running again
+}
 
-    xSemaphoreGive(p->second);
-    xSemaphoreGive(p->first);
-    vTaskDelete(NULL);
+int orphaned_lock(SemaphoreHandle_t semaphore, int *counter) {
+    if (xSemaphoreTake(semaphore, 500) == pdFALSE)
+        return pdFALSE; // if semaphore is unavailable, return as if unavailable
+    {
+        (*counter)++;
+        if(*counter % 2 == 0) {
+            return 0; // return 0 to continue on next iteration, but don't give semaphore back
+        }
+    }
+    xSemaphoreGive(semaphore); // won't be reached when count is even
+    return pdTRUE;
 }

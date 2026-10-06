@@ -6,6 +6,7 @@
 #include <FreeRTOS.h>
 #include <semphr.h>
 #include <threads.h>
+#include <pico/stdio_usb.h>
 
 SemaphoreHandle_t semaphore;
 int counter;
@@ -42,7 +43,7 @@ void test_side_thread_unavailable(void) {
     // Semaphore is unavailable
     xSemaphoreTake(semaphore, portMAX_DELAY);
 
-    int loop_return = do_loop(semaphore, &counter, "side", portMAX_DELAY);
+    int loop_return = do_loop(semaphore, &counter, "side", 0);
 
     printf("Testing do_loop for side with unavailable semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
@@ -69,7 +70,7 @@ void test_main_thread_unavailable(void) {
     // Semaphore is unavailable
     xSemaphoreTake(semaphore, portMAX_DELAY);
 
-    int loop_return = do_loop(semaphore, &counter, "main", portMAX_DELAY);
+    int loop_return = do_loop(semaphore, &counter, "main", 0);
 
     printf("Testing do_loop for main with unavailable semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
@@ -77,38 +78,54 @@ void test_main_thread_unavailable(void) {
     printf("OK\n\n");
 }
 
+// Deadlock testing
+void test_deadlock(void) {
+    TaskHandle_t deadlock_a, deadlock_b, deadlock_thread;
+    SemaphoreHandle_t first = xSemaphoreCreateCounting(1, 1);
+    SemaphoreHandle_t second = xSemaphoreCreateCounting(1, 1);
 
-// Spins up two tasks that lock sem_a/sem_b in opposite orders and starts the
-// scheduler. Not a pass/fail Unity test: vTaskStartScheduler() never returns.
-// The demonstration is watching UART output freeze after both tasks print
-// "waiting on second lock..." - that freeze is the deadlock.
-void run_deadlock_demo(void) {
-    static int counter_a = 0;
-    static int counter_b = 0;
-    static lock_pair_t a_args;
-    static lock_pair_t b_args;
+    struct deadlock_args task_a = {first, second, 0, 'a'};
+    struct deadlock_args task_b = {second, first, 10, 'b'}; 
 
-    SemaphoreHandle_t sem_a = xSemaphoreCreateCounting(1, 1);
-    SemaphoreHandle_t sem_b = xSemaphoreCreateCounting(1, 1);
-    SemaphoreHandle_t a_ready = xSemaphoreCreateCounting(1, 0);
-    SemaphoreHandle_t b_ready = xSemaphoreCreateCounting(1, 0);
+    BaseType_t status_a = xTaskCreate(deadlock, "Deadlock A", configMINIMAL_STACK_SIZE, (void *)&task_a, (tskIDLE_PRIORITY + 5UL) - 1UL, &deadlock_a);
+    BaseType_t status_b = xTaskCreate(deadlock, "Deadlock B", configMINIMAL_STACK_SIZE, (void *)&task_b, (tskIDLE_PRIORITY + 5UL) - 1UL, &deadlock_b);
+    
+    printf("Threads created.\n");
+    vTaskDelay(1000); // Allow time for threads to run
+    printf("1000 ticks later...\n");
 
-    a_args = (lock_pair_t){ sem_a, sem_b, a_ready, b_ready, &counter_a, "A" };
-    b_args = (lock_pair_t){ sem_b, sem_a, b_ready, a_ready, &counter_b, "B" }; // reversed order
+    // Both threads should have taken a semaphore,
+    // incremented their respective count twice, 
+    // and now be stuck.
+    TEST_ASSERT_EQUAL_INT_MESSAGE(uxSemaphoreGetCount(first), 0, "First semaphore is available, when it should be taken.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(uxSemaphoreGetCount(second), 0, "Second semaphore is available, when it should be taken.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, task_a.counter, "Thread A did not increment its counter twice.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(12, task_b.counter, "Thread B did not increment its counter twice.");
 
-    printf("Starting deadlock demo: A takes sem_a then sem_b, B takes sem_b then sem_a\n");
-
-    xTaskCreate(grab_two_locks, "LockerA", configMINIMAL_STACK_SIZE, &a_args, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(grab_two_locks, "LockerB", configMINIMAL_STACK_SIZE, &b_args, tskIDLE_PRIORITY + 1, NULL);
-
-    vTaskStartScheduler(); // never returns
+    vTaskDelete(deadlock_a);
+    vTaskDelete(deadlock_b);
+    printf("Killed threads.\n");
 }
 
-int main (void)
-{
-    stdio_init_all();
-    while (1) {
-        sleep_ms(5000); // Give time for TTY to attach.
+void test_orphaned(void){
+    SemaphoreHandle_t semaphore = xSemaphoreCreateCounting(1, 1);
+    int counter = 1; // start at 1 so that orphaned_lock will return 0 and not release lock
+
+    int first_call = orphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, first_call, "Orphaned_lock did not return pdTRUE when count was even.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, counter, "Counter was not incremented.");
+
+    int second_call = orphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, second_call, "Orphaned_lock did not return pdFALSE when count was odd.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(3, counter, "Counter was not incremented.");
+}
+
+void runner_thread(void *params) {
+    while(!stdio_usb_connected()) {
+        vTaskDelay(100); // Wait for USB to be connected
+    }
+
+    while(1){
         printf("Start tests\n");
         UNITY_BEGIN();
         RUN_TEST(test_smoke_string);
@@ -116,9 +133,18 @@ int main (void)
         RUN_TEST(test_main_thread_unavailable);
         RUN_TEST(test_side_thread_available);
         RUN_TEST(test_side_thread_unavailable);
-        sleep_ms(5000);
+        RUN_TEST(test_deadlock);
+        RUN_TEST(test_orphaned);
         UNITY_END();
-
-        run_deadlock_demo();
+        vTaskDelay(10000);
     }
+
+}
+
+int main (void)
+{
+    stdio_init_all();
+    xTaskCreate(runner_thread, "TestRunner", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 5UL, NULL);
+    vTaskStartScheduler();
+    return 0;
 }
