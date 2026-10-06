@@ -17,8 +17,8 @@ endif()
 
 # Modify the below lines to enable/disable output over UART/USB.
 # These are mutually exclusive, only set one.
-pico_enable_stdio_uart(mytest 0)
-pico_enable_stdio_usb(mytest 1)
+pico_enable_stdio_uart(mytest 1)
+pico_enable_stdio_usb(mytest 0)
 
 # This will speed up the simulation, since data won't be copied from the flash controller.
 # It does make the binary non-persistent on a real microcontroller.

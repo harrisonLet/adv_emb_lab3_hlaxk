@@ -6,7 +6,6 @@
 #include <FreeRTOS.h>
 #include <semphr.h>
 #include <threads.h>
-#include <pico/stdio_usb.h>
 
 SemaphoreHandle_t semaphore;
 int counter;
@@ -182,10 +181,6 @@ void test_unorphaned_no_deadlock(void) {
 }
 
 void runner_thread(void *params) {
-    while(!stdio_usb_connected()) {
-        vTaskDelay(100); // Wait for USB to be connected
-    }
-
     while(1){
         printf("Start tests\n");
         UNITY_BEGIN();
