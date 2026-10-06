@@ -109,15 +109,21 @@ void test_deadlock(void) {
 
 void test_orphaned(void){
     SemaphoreHandle_t semaphore = xSemaphoreCreateCounting(1, 1);
-    int counter = 1; // start at 1 so that orphaned_lock will return 0 and not release lock
+    int counter = 0;
 
     int first_call = orphaned_lock(semaphore, &counter);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, first_call, "Orphaned_lock did not return pdTRUE when count was even.");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(2, counter, "Counter was not incremented.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, first_call, "Orphaned_lock did not return pdTRUE when count was odd.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, counter, "Counter was not incremented.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, uxSemaphoreGetCount(semaphore), "Semaphore was not released when count was odd.");
 
     int second_call = orphaned_lock(semaphore, &counter);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, second_call, "Orphaned_lock did not return pdFALSE when count was odd.");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(3, counter, "Counter was not incremented.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, second_call, "Orphaned_lock did not return 0 when count was even.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, counter, "Counter was not incremented.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, uxSemaphoreGetCount(semaphore), "Semaphore was released when count was even.");
+
+    int third_call = orphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, third_call, "Orphaned_lock did not return pdFALSE on an orphaned semaphore.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, counter, "Counter incremented without holding the semaphore.");
 }
 
 void runner_thread(void *params) {

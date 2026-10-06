@@ -23,7 +23,6 @@ void side_thread(void *params)
 	while (1) {
         vTaskDelay(100);
 		do_loop(semaphore, &counter, "side", portMAX_DELAY);
-        xSemaphoreGive(semaphore);
 	}
 }
 
@@ -34,7 +33,6 @@ void main_thread(void *params)
         vTaskDelay(100);
 		do_loop(semaphore, &counter, "main", portMAX_DELAY);
         on = !on;
-        xSemaphoreGive(semaphore);
 	}
 }
 
