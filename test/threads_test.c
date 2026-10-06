@@ -6,6 +6,7 @@
 #include <FreeRTOS.h>
 #include <semphr.h>
 #include <threads.h>
+#include <pico/stdio_usb.h>
 
 SemaphoreHandle_t semaphore;
 int counter;
@@ -42,7 +43,7 @@ void test_side_thread_unavailable(void) {
     // Semaphore is unavailable
     xSemaphoreTake(semaphore, portMAX_DELAY);
 
-    int loop_return = do_loop(semaphore, &counter, "side", portMAX_DELAY);
+    int loop_return = do_loop(semaphore, &counter, "side", 0);
 
     printf("Testing do_loop for side with unavailable semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
@@ -69,7 +70,7 @@ void test_main_thread_unavailable(void) {
     // Semaphore is unavailable
     xSemaphoreTake(semaphore, portMAX_DELAY);
 
-    int loop_return = do_loop(semaphore, &counter, "main", portMAX_DELAY);
+    int loop_return = do_loop(semaphore, &counter, "main", 0);
 
     printf("Testing do_loop for main with unavailable semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
@@ -127,8 +128,11 @@ void test_deadlock_threads_lock(void) {
     */
 
 void runner_thread(void *params) {
+    while(!stdio_usb_connected()) {
+        vTaskDelay(100); // Wait for USB to be connected
+    }
+
     while(1){
-        vTaskDelay(1000); // time for debugger to attach
         printf("Start tests\n");
         UNITY_BEGIN();
         RUN_TEST(test_smoke_string);
