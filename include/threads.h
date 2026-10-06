@@ -28,6 +28,10 @@ struct orphaned_args {
 
 void orphaned_thread(void *params);
 
+int unorphaned_lock(SemaphoreHandle_t semaphore, int *counter);
+
+void unorphaned_thread(void *params);
+
 typedef struct {
     SemaphoreHandle_t first;
     SemaphoreHandle_t second;

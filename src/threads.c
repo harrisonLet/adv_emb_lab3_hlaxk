@@ -64,3 +64,22 @@ void orphaned_thread(void *params) {
         orphaned_lock(args->semaphore, &args->counter);
     }
 }
+
+int unorphaned_lock(SemaphoreHandle_t semaphore, int *counter) {
+    if (xSemaphoreTake(semaphore, 500) == pdFALSE)
+        return pdFALSE;
+    {
+        (*counter)++;
+    }
+    xSemaphoreGive(semaphore);
+    return pdTRUE;
+}
+
+void unorphaned_thread(void *params) {
+    struct orphaned_args *args = (struct orphaned_args *)params;
+
+    while (1) {
+        unorphaned_lock(args->semaphore, &args->counter);
+        vTaskDelay(10);
+    }
+}
