@@ -15,24 +15,14 @@ void setUp(void) {}
 void tearDown(void) {}
 
 
-void test_smoke_string(void) {
-    const char *expected = "hello unity";
-    const char *actual = "hello unity";
-
-    printf("Smoke test: UART/Unity pipeline is alive\n");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(expected, actual, "Smoke test string mismatch\n");
-}
-
 void test_side_thread_available(void) {
     semaphore = xSemaphoreCreateCounting(1, 1);
     counter = 0;
 
     int loop_return = do_loop(semaphore, &counter, "side", portMAX_DELAY);
 
-    printf("Testing do_loop for side with available semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, counter, "Counter did not increment on available semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, loop_return, "Semaphore did not return available status code when available\n");
-    printf("OK\n\n");
 }
 
 void test_side_thread_unavailable(void) {
@@ -44,10 +34,8 @@ void test_side_thread_unavailable(void) {
 
     int loop_return = do_loop(semaphore, &counter, "side", 0);
 
-    printf("Testing do_loop for side with unavailable semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, loop_return, "Semaphore did not return unavailable status code when unavailable\n");
-    printf("OK\n\n");
 }
 
 void test_main_thread_available(void) {
@@ -56,10 +44,8 @@ void test_main_thread_available(void) {
 
     int loop_return = do_loop(semaphore, &counter, "main", portMAX_DELAY);
 
-    printf("Testing do_loop for main with available semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, counter, "Counter did not incremenet on available semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, loop_return, "Semaphore did not return available status code when available\n");
-    printf("OK\n\n");
 }
 
 void test_main_thread_unavailable(void) {
@@ -71,10 +57,8 @@ void test_main_thread_unavailable(void) {
 
     int loop_return = do_loop(semaphore, &counter, "main", 0);
 
-    printf("Testing do_loop for main with unavailable semaphore\n\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, counter, "Counter incremented on unavailable semaphore\n");
     TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, loop_return, "Semaphore did not return unavailable status code when unavailable\n");
-    printf("OK\n\n");
 }
 
 // Deadlock testing
@@ -89,9 +73,7 @@ void test_deadlock(void) {
     BaseType_t status_a = xTaskCreate(deadlock, "Deadlock A", configMINIMAL_STACK_SIZE, (void *)&task_a, (tskIDLE_PRIORITY + 5UL) - 1UL, &deadlock_a);
     BaseType_t status_b = xTaskCreate(deadlock, "Deadlock B", configMINIMAL_STACK_SIZE, (void *)&task_b, (tskIDLE_PRIORITY + 5UL) - 1UL, &deadlock_b);
     
-    printf("Threads created.\n");
     vTaskDelay(1000); // Allow time for threads to run
-    printf("1000 ticks later...\n");
 
     // Both threads should have taken a semaphore,
     // incremented their respective count twice, 
@@ -103,7 +85,6 @@ void test_deadlock(void) {
 
     vTaskDelete(deadlock_a);
     vTaskDelete(deadlock_b);
-    printf("Killed threads.\n");
 }
 
 void test_orphaned(void){
@@ -131,7 +112,6 @@ void test_orphaned_deadlock(void) {
 
     xTaskCreate(orphaned_thread, "Orphaned", configMINIMAL_STACK_SIZE, (void *)&args, (tskIDLE_PRIORITY + 5UL) - 1UL, &orphan);
 
-    printf("Orphaned thread created.\n");
     vTaskDelay(1000); // Allow time for the thread to orphan the lock
     vTaskSuspend(orphan);
 
@@ -169,7 +149,6 @@ void test_unorphaned_no_deadlock(void) {
 
     xTaskCreate(unorphaned_thread, "Unorphaned", configMINIMAL_STACK_SIZE, (void *)&args, (tskIDLE_PRIORITY + 5UL) - 1UL, &unorphan);
 
-    printf("Unorphaned thread created.\n");
     vTaskDelay(1000); // Allow time for the thread to loop past an even count many times
     vTaskSuspend(unorphan);
 
@@ -184,7 +163,6 @@ void runner_thread(void *params) {
     while(1){
         printf("Start tests\n");
         UNITY_BEGIN();
-        RUN_TEST(test_smoke_string);
         RUN_TEST(test_main_thread_available);
         RUN_TEST(test_main_thread_unavailable);
         RUN_TEST(test_side_thread_available);
