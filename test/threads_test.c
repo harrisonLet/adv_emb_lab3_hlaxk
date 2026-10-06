@@ -78,6 +78,32 @@ void test_main_thread_unavailable(void) {
 }
 
 
+// Spins up two tasks that lock sem_a/sem_b in opposite orders and starts the
+// scheduler. Not a pass/fail Unity test: vTaskStartScheduler() never returns.
+// The demonstration is watching UART output freeze after both tasks print
+// "waiting on second lock..." - that freeze is the deadlock.
+void run_deadlock_demo(void) {
+    static int counter_a = 0;
+    static int counter_b = 0;
+    static lock_pair_t a_args;
+    static lock_pair_t b_args;
+
+    SemaphoreHandle_t sem_a = xSemaphoreCreateCounting(1, 1);
+    SemaphoreHandle_t sem_b = xSemaphoreCreateCounting(1, 1);
+    SemaphoreHandle_t a_ready = xSemaphoreCreateCounting(1, 0);
+    SemaphoreHandle_t b_ready = xSemaphoreCreateCounting(1, 0);
+
+    a_args = (lock_pair_t){ sem_a, sem_b, a_ready, b_ready, &counter_a, "A" };
+    b_args = (lock_pair_t){ sem_b, sem_a, b_ready, a_ready, &counter_b, "B" }; // reversed order
+
+    printf("Starting deadlock demo: A takes sem_a then sem_b, B takes sem_b then sem_a\n");
+
+    xTaskCreate(grab_two_locks, "LockerA", configMINIMAL_STACK_SIZE, &a_args, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(grab_two_locks, "LockerB", configMINIMAL_STACK_SIZE, &b_args, tskIDLE_PRIORITY + 1, NULL);
+
+    vTaskStartScheduler(); // never returns
+}
+
 int main (void)
 {
     stdio_init_all();
@@ -92,5 +118,7 @@ int main (void)
         RUN_TEST(test_side_thread_unavailable);
         sleep_ms(5000);
         UNITY_END();
+
+        run_deadlock_demo();
     }
 }
