@@ -3,13 +3,6 @@
 #include <semphr.h>
 #include <task.h>
 
-struct deadlock_args {
-    SemaphoreHandle_t first;
-    SemaphoreHandle_t second;
-    int counter;
-    char id;
-};
-
 int do_loop(SemaphoreHandle_t semaphore,
             int *counter,
             const char *src,
@@ -48,4 +41,17 @@ void deadlock(void *params) {
     }
     xSemaphoreGive(args->first);
     vTaskSuspend(NULL); // suspend this task to avoid it running again
+}
+
+int orphaned_lock(SemaphoreHandle_t semaphore, int *counter) {
+    if (xSemaphoreTake(semaphore, portMAX_DELAY) == pdFALSE)
+        return pdFALSE; // if semaphore is unavailable, return as if unavailable
+    {
+        (*counter)++;
+        if(*counter % 2 == 0) {
+            return 0; // return 0 to continue on next iteration, but don't give semaphore back
+        }
+    }
+    xSemaphoreGive(semaphore); // won't be reached when count is even
+    return pdTRUE;
 }
