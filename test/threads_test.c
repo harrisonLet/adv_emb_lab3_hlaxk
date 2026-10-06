@@ -126,6 +126,23 @@ void test_orphaned(void){
     TEST_ASSERT_EQUAL_INT_MESSAGE(2, counter, "Counter incremented without holding the semaphore.");
 }
 
+void test_orphaned_deadlock(void) {
+    TaskHandle_t orphan;
+    struct orphaned_args args = {xSemaphoreCreateCounting(1, 1), 0};
+
+    xTaskCreate(orphaned_thread, "Orphaned", configMINIMAL_STACK_SIZE, (void *)&args, (tskIDLE_PRIORITY + 5UL) - 1UL, &orphan);
+
+    printf("Orphaned thread created.\n");
+    vTaskDelay(1000); // Allow time for the thread to orphan the lock
+    vTaskSuspend(orphan);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, uxSemaphoreGetCount(args.semaphore), "Semaphore is available, when it should be orphaned.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, args.counter, "Thread kept incrementing after orphaning the lock.");
+
+    vTaskDelete(orphan);
+    vSemaphoreDelete(args.semaphore);
+}
+
 void runner_thread(void *params) {
     while(!stdio_usb_connected()) {
         vTaskDelay(100); // Wait for USB to be connected
@@ -141,6 +158,7 @@ void runner_thread(void *params) {
         RUN_TEST(test_side_thread_unavailable);
         RUN_TEST(test_deadlock);
         RUN_TEST(test_orphaned);
+        RUN_TEST(test_orphaned_deadlock);
         UNITY_END();
         vTaskDelay(10000);
     }

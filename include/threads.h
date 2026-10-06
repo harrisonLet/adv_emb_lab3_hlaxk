@@ -21,11 +21,18 @@ void deadlock(void *params);
 
 int orphaned_lock(SemaphoreHandle_t semaphore, int *counter);
 
+struct orphaned_args {
+    SemaphoreHandle_t semaphore;
+    int counter;
+};
+
+void orphaned_thread(void *params);
+
 typedef struct {
-    SemaphoreHandle_t first;       // lock this task takes first
-    SemaphoreHandle_t second;      // lock this task takes second (where it can deadlock)
-    SemaphoreHandle_t my_ready;    // this task gives it once it holds `first`
-    SemaphoreHandle_t other_ready; // this task waits on it before trying `second`
+    SemaphoreHandle_t first;
+    SemaphoreHandle_t second;
+    SemaphoreHandle_t my_ready;
+    SemaphoreHandle_t other_ready;
     int *counter;
     const char *name;
 } lock_pair_t;

@@ -56,3 +56,11 @@ int orphaned_lock(SemaphoreHandle_t semaphore, int *counter) {
     xSemaphoreGive(semaphore); // won't be reached when count is even
     return pdTRUE;
 }
+
+void orphaned_thread(void *params) {
+    struct orphaned_args *args = (struct orphaned_args *)params;
+
+    while (1) {
+        orphaned_lock(args->semaphore, &args->counter);
+    }
+}
