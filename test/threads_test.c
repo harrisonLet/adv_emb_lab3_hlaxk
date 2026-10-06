@@ -99,33 +99,26 @@ void test_deadlock(void) {
     // and now be stuck.
     TEST_ASSERT_EQUAL_INT_MESSAGE(uxSemaphoreGetCount(first), 0, "First semaphore is available, when it should be taken.");
     TEST_ASSERT_EQUAL_INT_MESSAGE(uxSemaphoreGetCount(second), 0, "Second semaphore is available, when it should be taken.");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(task_a.counter, 2, "Thread A did not increment its counter twice.");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(task_b.counter, 12, "Thread B did not increment its counter twice.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, task_a.counter, "Thread A did not increment its counter twice.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(12, task_b.counter, "Thread B did not increment its counter twice.");
 
     vTaskDelete(deadlock_a);
     vTaskDelete(deadlock_b);
     printf("Killed threads.\n");
 }
 
-/*
-void test_deadlock_threads_lock(void) {
-    TaskHandle_t deadlock_a, deadlock_b;
-    SemaphoreHandle_t x = xSemaphoreCreateCounting(1,1);
-    SemaphoreHandle_t y = xSemaphoreCreateCounting(1,1);
-    int counter = 0;
+void test_orphaned(void){
+    SemaphoreHandle_t semaphore = xSemaphoreCreateCounting(1, 1);
+    int counter = 1; // start at 1 so that orphaned_lock will return 0 and not release lock
 
-    struct deadlock_args task1 = {x, y, &counter, 'A', 100};
-    struct deadlock_args task2 = {y, x, &counter, 'B', 100};
+    int first_call = orphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, first_call, "Orphaned_lock did not return pdTRUE when count was even.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, counter, "Counter was not incremented.");
 
-    xTaskCreate(deadlock, "Deadlock A", configMINIMAL_STACK_SIZE, &task1, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(deadlock, "Deadlock B", configMINIMAL_STACK_SIZE, &task2, tskIDLE_PRIORITY + 1, NULL);
-
-    vTaskStartScheduler();
-
-    // The test will not reach this point if a deadlock occurs
-    TEST_ASSERT_TRUE_MESSAGE(counter < 4, "Deadlock occurred: both threads are waiting for each other.");
+    int second_call = orphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdFALSE, second_call, "Orphaned_lock did not return pdFALSE when count was odd.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(3, counter, "Counter was not incremented.");
 }
-    */
 
 void runner_thread(void *params) {
     while(!stdio_usb_connected()) {
@@ -141,6 +134,7 @@ void runner_thread(void *params) {
         RUN_TEST(test_side_thread_available);
         RUN_TEST(test_side_thread_unavailable);
         RUN_TEST(test_deadlock);
+        RUN_TEST(test_orphaned);
         UNITY_END();
         vTaskDelay(10000);
     }

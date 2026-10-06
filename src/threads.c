@@ -44,7 +44,7 @@ void deadlock(void *params) {
 }
 
 int orphaned_lock(SemaphoreHandle_t semaphore, int *counter) {
-    if (xSemaphoreTake(semaphore, portMAX_DELAY) == pdFALSE)
+    if (xSemaphoreTake(semaphore, 500) == pdFALSE)
         return pdFALSE; // if semaphore is unavailable, return as if unavailable
     {
         (*counter)++;
