@@ -143,6 +143,44 @@ void test_orphaned_deadlock(void) {
     vSemaphoreDelete(args.semaphore);
 }
 
+void test_unorphaned(void){
+    SemaphoreHandle_t semaphore = xSemaphoreCreateCounting(1, 1);
+    int counter = 0;
+
+    int first_call = unorphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, first_call, "Unorphaned_lock did not return pdTRUE when count was odd.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, counter, "Counter was not incremented.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, uxSemaphoreGetCount(semaphore), "Semaphore was not released when count was odd.");
+
+    int second_call = unorphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, second_call, "Unorphaned_lock did not return pdTRUE when count was even.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, counter, "Counter was not incremented.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, uxSemaphoreGetCount(semaphore), "Semaphore was not released when count was even.");
+
+    int third_call = unorphaned_lock(semaphore, &counter);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(pdTRUE, third_call, "Unorphaned_lock could not take the semaphore after an even count.");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(3, counter, "Counter was not incremented.");
+
+    vSemaphoreDelete(semaphore);
+}
+
+void test_unorphaned_no_deadlock(void) {
+    TaskHandle_t unorphan;
+    struct orphaned_args args = {xSemaphoreCreateCounting(1, 1), 0};
+
+    xTaskCreate(unorphaned_thread, "Unorphaned", configMINIMAL_STACK_SIZE, (void *)&args, (tskIDLE_PRIORITY + 5UL) - 1UL, &unorphan);
+
+    printf("Unorphaned thread created.\n");
+    vTaskDelay(1000); // Allow time for the thread to loop past an even count many times
+    vTaskSuspend(unorphan);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, uxSemaphoreGetCount(args.semaphore), "Semaphore is held, when it should be released.");
+    TEST_ASSERT_GREATER_THAN_INT_MESSAGE(2, args.counter, "Thread stopped incrementing, so it deadlocked.");
+
+    vTaskDelete(unorphan);
+    vSemaphoreDelete(args.semaphore);
+}
+
 void runner_thread(void *params) {
     while(!stdio_usb_connected()) {
         vTaskDelay(100); // Wait for USB to be connected
@@ -159,6 +197,8 @@ void runner_thread(void *params) {
         RUN_TEST(test_deadlock);
         RUN_TEST(test_orphaned);
         RUN_TEST(test_orphaned_deadlock);
+        RUN_TEST(test_unorphaned);
+        RUN_TEST(test_unorphaned_no_deadlock);
         UNITY_END();
         vTaskDelay(10000);
     }
