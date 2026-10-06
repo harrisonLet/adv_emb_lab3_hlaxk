@@ -19,6 +19,8 @@ int do_loop(SemaphoreHandle_t semaphore,
             
 void deadlock(void *params);
 
+int orphaned_lock(SemaphoreHandle_t semaphore, int *counter);
+
 typedef struct {
     SemaphoreHandle_t first;       // lock this task takes first
     SemaphoreHandle_t second;      // lock this task takes second (where it can deadlock)
